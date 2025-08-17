@@ -18,6 +18,7 @@ fun ExpenseEntity.toDomain(): Expense {
         description = description,
         amount = amount,
         date = LocalDate.parse(date),  // Convert ISO string back to LocalDate
+        categoryId = categoryId,
         userId = userId
     )
 }
@@ -32,6 +33,7 @@ fun Expense.toEntity(): ExpenseEntity {
         description = description,
         amount = amount,
         date = date.toString(),  // Convert LocalDate to ISO string
+        categoryId = categoryId,
         userId = userId,
         createdAt = now,
         updatedAt = now
@@ -42,6 +44,29 @@ fun Expense.toEntity(): ExpenseEntity {
  * Convert list of entities to domain objects
  */
 fun List<ExpenseEntity>.toDomainList(): List<Expense> {
+    return this.map { it.toDomain() }
+}
+
+/**
+ * Convert ExpenseWithCategory to Expense domain model
+ */
+fun com.example.spenttracker.data.local.ExpenseDao.ExpenseWithCategory.toDomain(): Expense {
+    return Expense(
+        id = id,
+        description = description,
+        amount = amount,
+        date = LocalDate.parse(date),
+        categoryId = categoryId,
+        categoryName = categoryName,
+        categoryColor = categoryColor,
+        userId = userId
+    )
+}
+
+/**
+ * Convert list of ExpenseWithCategory to domain objects
+ */
+fun List<com.example.spenttracker.data.local.ExpenseDao.ExpenseWithCategory>.toDomainListWithCategories(): List<Expense> {
     return this.map { it.toDomain() }
 }
 

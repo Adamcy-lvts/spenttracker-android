@@ -1,0 +1,38 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+  
+  <!-- Background circle for better visibility -->
+  <path
+      android:pathData="M54,54m-50,0a50,50 0,1 1,100 0a50,50 0,1 1,-100 0"
+      android:fillColor="#FFFFFF"/>
+  
+  <!-- Your company logo centered and scaled -->
+  <group
+      android:translateX="27"
+      android:translateY="30"
+      android:scaleX="0.5"
+      android:scaleY="0.5">
+    
+    <!-- Orange section -->
+    <group>
+      <clip-path
+          android:pathData="M28.15,48.76l0,-16.25l0,-16.26l-14.07,8.13l-14.08,8.13l0,32.51l56.3,32.5l0,-32.5z"/>
+      <path
+          android:pathData="M0,16.25h56.3v81.27h-56.3z"
+          android:fillColor="#F37321"/>
+    </group>
+    
+    <!-- Blue section -->
+    <group>
+      <clip-path
+          android:pathData="M74.3,48.76l0,16.26l0,16.25l14.07,-8.13l14.08,-8.12l0,-32.51l-56.31,-32.51l0,32.51z"/>
+      <path
+          android:pathData="M46.14,0h56.3v81.27h-56.3z"
+          android:fillColor="#517ABD"/>
+    </group>
+    
+  </group>
+</vector>

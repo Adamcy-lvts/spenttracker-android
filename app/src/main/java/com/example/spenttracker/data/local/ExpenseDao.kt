@@ -18,6 +18,17 @@ interface ExpenseDao {
     fun getAllExpenses(): Flow<List<ExpenseEntity>>
     
     /**
+     * Get expenses with category information
+     */
+    @Query("""
+        SELECT e.*, c.name as category_name, c.color as category_color
+        FROM expenses e
+        LEFT JOIN categories c ON e.category_id = c.id
+        ORDER BY e.date DESC, e.id DESC
+    """)
+    fun getExpensesWithCategories(): Flow<List<ExpenseWithCategory>>
+    
+    /**
      * Get single expense by ID
      */
     @Query("SELECT * FROM expenses WHERE id = :id")
@@ -58,4 +69,18 @@ interface ExpenseDao {
      */
     @Query("DELETE FROM expenses")
     suspend fun deleteAllExpenses()
+    
+    // Data class for expense with category information
+    data class ExpenseWithCategory(
+        val id: Int,
+        val description: String,
+        val amount: Double,
+        val date: String,
+        @ColumnInfo(name = "category_id") val categoryId: Int?,
+        val userId: Int,
+        val createdAt: String,
+        val updatedAt: String,
+        @ColumnInfo(name = "category_name") val categoryName: String?,
+        @ColumnInfo(name = "category_color") val categoryColor: String?
+    )
 }

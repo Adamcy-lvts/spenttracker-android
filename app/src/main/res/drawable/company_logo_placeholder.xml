@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Professional expense tracker logo -->
+    <group>
+        <!-- Background circle -->
+        <path
+            android:pathData="M54,54m-45,0a45,45 0,1 1,90 0a45,45 0,1 1,-90 0"
+            android:fillColor="#6366F1" />
+        
+        <!-- Receipt/Document icon -->
+        <group android:translateX="30" android:translateY="25">
+            <!-- Receipt background -->
+            <path
+                android:pathData="M8,8 L40,8 Q44,8 44,12 L44,50 Q44,54 40,54 L8,54 Q4,54 4,50 L4,12 Q4,8 8,8 Z"
+                android:fillColor="#FFFFFF" />
+            
+            <!-- Receipt lines -->
+            <path
+                android:pathData="M12,18 L36,18 M12,26 L32,26 M12,34 L36,34 M12,42 L28,42"
+                android:strokeColor="#6366F1"
+                android:strokeWidth="2"
+                android:strokeLineCap="round" />
+            
+            <!-- Dollar symbol overlay -->
+            <path
+                android:pathData="M24,12 L24,50 M16,20 Q16,16 24,16 Q32,16 32,20 Q32,24 24,24 L16,24 Q16,28 24,28 Q32,28 32,32 Q32,36 24,36 Q16,36 16,32"
+                android:strokeColor="#10B981"
+                android:strokeWidth="2.5"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round" />
+        </group>
+        
+        <!-- Your company branding space -->
+        <path
+            android:pathData="M20,85 L88,85"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="1"
+            android:strokeLineCap="round"
+            android:fillAlpha="0.3" />
+    </group>
+</vector>

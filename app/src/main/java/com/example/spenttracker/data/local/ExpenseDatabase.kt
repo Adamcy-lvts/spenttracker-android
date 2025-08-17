@@ -5,18 +5,21 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import android.content.Context
 import com.example.spenttracker.data.local.entity.ExpenseEntity
+import com.example.spenttracker.data.local.entity.CategoryEntity
 
 /**
  * Room database configuration
+ * Updated to include Category support
  */
 @Database(
-    entities = [ExpenseEntity::class],
-    version = 1,
+    entities = [ExpenseEntity::class, CategoryEntity::class],
+    version = 3,
     exportSchema = false
 )
 abstract class ExpenseDatabase : RoomDatabase() {
     
     abstract fun expenseDao(): ExpenseDao
+    abstract fun categoryDao(): CategoryDao
     
     companion object {
         @Volatile
@@ -28,7 +31,9 @@ abstract class ExpenseDatabase : RoomDatabase() {
                     context.applicationContext,
                     ExpenseDatabase::class.java,
                     "expense_database"
-                ).build()
+                )
+                .fallbackToDestructiveMigration() // For development - recreate DB on version change
+                .build()
                 
                 INSTANCE = instance
                 instance

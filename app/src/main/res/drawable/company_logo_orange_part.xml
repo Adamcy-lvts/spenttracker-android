@@ -1,0 +1,15 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="1024.5"
+    android:viewportHeight="975.2">
+  
+  <!-- Orange section only -->
+  <group>
+    <clip-path
+        android:pathData="M281.5,487.6l0,-162.5l0,-162.6l-140.7,81.3l-140.8,81.3l0,325.1l563,325l0,-325z"/>
+    <path
+        android:pathData="M0,162.5h563v812.7h-563z"
+        android:fillColor="#F37321"/>
+  </group>
+</vector>

@@ -3,6 +3,6 @@ package com.example.spenttracker
 import android.app.Application
 
 /**
- * Simple Application class - no dependency injection needed
+ * Application class for SpentTracker
  */
 class SpentTrackerApplication : Application()

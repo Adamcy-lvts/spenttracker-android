@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:opacity="opaque">
+    
+    <!-- Background color -->
+    <item android:drawable="@color/splash_background_color" />
+    
+    <!-- Company logo -->
+    <item android:gravity="center">
+        <bitmap
+            android:src="@drawable/my_company"
+            android:gravity="center" />
+    </item>
+    
+</layer-list>

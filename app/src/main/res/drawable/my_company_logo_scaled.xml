@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- White circular background -->
+    <path
+        android:pathData="M54,54m-45,0a45,45 0,1 1,90 0a45,45 0,1 1,-90 0"
+        android:fillColor="#FFFFFF" />
+    
+    <!-- Your company logo scaled down and centered -->
+    <group 
+        android:translateX="54"
+        android:translateY="54"
+        android:scaleX="0.06"
+        android:scaleY="0.06"
+        android:pivotX="0"
+        android:pivotY="0">
+        
+        <!-- Move logo to center of its own coordinate system -->
+        <group android:translateX="-512" android:translateY="-487">
+            <!-- Your original logo paths -->
+            <group>
+                <clip-path
+                    android:pathData="M281.5,487.6l0,-162.5l0,-162.6l-140.7,81.3l-140.8,81.3l0,325.1l563,325l0,-325z"/>
+                <path
+                    android:pathData="M0,162.5h563v812.7h-563z"
+                    android:fillColor="#F37321"/>
+            </group>
+            <group>
+                <clip-path
+                    android:pathData="M743,487.6l0,162.6l0,162.5l140.7,-81.3l140.8,-81.2l0,-325.1l-563.1,-325.1l0,325.1z"/>
+                <path
+                    android:pathData="M461.4,0h563v812.7h-563z"
+                    android:fillColor="#517ABD"/>
+            </group>
+        </group>
+    </group>
+</vector>
