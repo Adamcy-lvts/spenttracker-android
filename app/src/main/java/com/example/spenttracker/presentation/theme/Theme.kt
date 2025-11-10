@@ -10,7 +10,7 @@ import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun SpentTrackerTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = true, // Default to dark mode
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = false, // Disabled to use shadcn colors
     content: @Composable () -> Unit
@@ -21,8 +21,8 @@ fun SpentTrackerTheme(
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+        darkTheme -> SpentTrackerDarkColorScheme
+        else -> SpentTrackerLightColorScheme
     }
 
     MaterialTheme(

@@ -9,13 +9,14 @@ import com.example.spenttracker.domain.model.Category
 import com.example.spenttracker.domain.repository.CategoryRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import javax.inject.Inject
 
 /**
  * Category Repository Implementation
  * Handles all category data operations using Room database
  * Like Laravel Eloquent Repository
  */
-class CategoryRepositoryImpl(
+class CategoryRepositoryImpl @Inject constructor(
     private val categoryDao: CategoryDao
 ) : CategoryRepository {
     
@@ -44,29 +45,23 @@ class CategoryRepositoryImpl(
     }
     
     override suspend fun getCategoryById(id: Int): Category? {
-        return categoryDao.getCategoryById(id)?.toDomain()
+        return categoryDao.getCategoryById(id.toLong())?.toDomain()
     }
     
-    override suspend fun addCategory(category: Category): Long {
-        return categoryDao.insertCategory(category.toEntity())
+    // Categories are now read-only for users (managed globally by admin)
+    // Removed: addCategory, updateCategory, deleteCategory, toggleCategoryStatus
+    
+    /**
+     * Internal method for sync operations - updates categories from server
+     */
+    internal suspend fun syncCategory(category: Category) {
+        categoryDao.insertCategory(category.toEntity())
     }
     
-    override suspend fun updateCategory(category: Category) {
+    /**
+     * Internal method for sync operations - updates category from server
+     */
+    internal suspend fun updateCategoryFromServer(category: Category) {
         categoryDao.updateCategory(category.toEntity())
-    }
-    
-    override suspend fun deleteCategory(id: Int) {
-        categoryDao.deleteCategoryById(id)
-    }
-    
-    override suspend fun toggleCategoryStatus(id: Int) {
-        val category = categoryDao.getCategoryById(id)
-        category?.let {
-            val updatedCategory = it.copy(
-                isActive = !it.isActive,
-                updatedAt = System.currentTimeMillis()
-            )
-            categoryDao.updateCategory(updatedCategory)
-        }
     }
 }

@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose.compiler)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
 }
 
 android {
@@ -53,6 +54,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation("androidx.compose.material:material-icons-extended")
     
     // Splash Screen API
     implementation("androidx.core:core-splashscreen:1.0.1")
@@ -62,6 +64,39 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     
+    // Hilt dependency injection
+    implementation(libs.hilt.android)
+    implementation(libs.hilt.navigation.compose)
+    ksp(libs.hilt.compiler)
+    
+    // Network dependencies
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.gson)
+    implementation(libs.okhttp.logging)
+    implementation(libs.gson)
+    
+    // DataStore for secure preferences storage
+    implementation(libs.datastore.preferences)
+    
+    // Security for encrypted preferences
+    implementation(libs.androidx.security.crypto)
+    
+    // WorkManager for background tasks
+    implementation(libs.workmanager)
+    implementation(libs.workmanager.hilt)
+    
+    // Google Play Services Location & Maps
+    implementation(libs.gms.location)
+    implementation(libs.gms.maps)
+    
+    // Google Places API (New SDK with SearchNearby support)
+    implementation(libs.gms.places)
+    
+    // Coroutines support for Play Services
+    implementation(libs.coroutines.play.services)
+    
+    // Font Awesome Icons for beautiful UI
+    implementation(libs.compose.icons.font.awesome)
     
     // Testing libraries
     testImplementation(libs.junit)

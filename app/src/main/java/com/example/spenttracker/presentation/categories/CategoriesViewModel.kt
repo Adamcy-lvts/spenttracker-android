@@ -27,17 +27,9 @@ class CategoriesViewModel(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
     
-    // Operation states
-    private val _isAddingCategory = MutableStateFlow(false)
-    val isAddingCategory: StateFlow<Boolean> = _isAddingCategory.asStateFlow()
+    // Categories are now read-only - no operation states needed
     
-    private val _isUpdatingCategory = MutableStateFlow(false)
-    val isUpdatingCategory: StateFlow<Boolean> = _isUpdatingCategory.asStateFlow()
-    
-    private val _isDeletingCategory = MutableStateFlow(false)
-    val isDeletingCategory: StateFlow<Boolean> = _isDeletingCategory.asStateFlow()
-    
-    // Events (like Vue.js toast notifications)
+    // Events (like Vue.js toast notifications) - simplified
     private val _eventFlow = MutableSharedFlow<CategoryListEvent>()
     val eventFlow = _eventFlow.asSharedFlow()
     
@@ -47,35 +39,12 @@ class CategoriesViewModel(
     }
     
     /**
-     * Create default categories if none exist (first app launch)
+     * Categories are now global - no local initialization needed
+     * Categories will be synced from server
      */
     private fun createDefaultCategoriesIfEmpty() {
-        viewModelScope.launch {
-            try {
-                val existingCategories = repository.getAllCategories()
-                if (existingCategories.isEmpty()) {
-                    // Default categories matching typical expense categories
-                    val defaultCategories = listOf(
-                        Category(name = "Food & Dining", color = "#F59E0B", description = "Restaurants, groceries, and food delivery"),
-                        Category(name = "Transportation", color = "#10B981", description = "Gas, parking, public transit, ride-sharing"),
-                        Category(name = "Shopping", color = "#EC4899", description = "Clothing, electronics, and general purchases"),
-                        Category(name = "Bills & Utilities", color = "#EF4444", description = "Rent, electricity, phone, internet"),
-                        Category(name = "Entertainment", color = "#8B5CF6", description = "Movies, games, subscriptions, hobbies"),
-                        Category(name = "Health & Medical", color = "#06B6D4", description = "Doctor visits, pharmacy, medical expenses"),
-                        Category(name = "Education", color = "#3B82F6", description = "Books, courses, school fees"),
-                        Category(name = "Travel", color = "#84CC16", description = "Hotels, flights, vacation expenses"),
-                        Category(name = "Personal Care", color = "#F97316", description = "Haircuts, cosmetics, personal items"),
-                        Category(name = "Other", color = "#6B7280", description = "Miscellaneous expenses")
-                    )
-                    
-                    defaultCategories.forEach { category ->
-                        repository.addCategory(category)
-                    }
-                }
-            } catch (e: Exception) {
-                // Fail silently for default categories - not critical
-            }
-        }
+        // Categories are managed globally - no local initialization needed
+        // They will be loaded from server via sync
     }
     
     /**
@@ -96,70 +65,8 @@ class CategoriesViewModel(
         }
     }
     
-    /**
-     * Add new category
-     */
-    fun addCategory(category: Category) {
-        viewModelScope.launch {
-            try {
-                _isAddingCategory.value = true
-                repository.addCategory(category)
-                _eventFlow.emit(CategoryListEvent.ShowSnackbar("Category added successfully! 🎉"))
-            } catch (e: Exception) {
-                _eventFlow.emit(CategoryListEvent.ShowSnackbar("Failed to add category: ${e.message}"))
-            } finally {
-                _isAddingCategory.value = false
-            }
-        }
-    }
-    
-    /**
-     * Update existing category
-     */
-    fun updateCategory(category: Category) {
-        viewModelScope.launch {
-            try {
-                _isUpdatingCategory.value = true
-                repository.updateCategory(category)
-                _eventFlow.emit(CategoryListEvent.ShowSnackbar("Category updated successfully! ✏️"))
-            } catch (e: Exception) {
-                _eventFlow.emit(CategoryListEvent.ShowSnackbar("Failed to update category: ${e.message}"))
-            } finally {
-                _isUpdatingCategory.value = false
-            }
-        }
-    }
-    
-    /**
-     * Delete category
-     */
-    fun deleteCategory(categoryId: Int) {
-        viewModelScope.launch {
-            try {
-                _isDeletingCategory.value = true
-                repository.deleteCategory(categoryId)
-                _eventFlow.emit(CategoryListEvent.ShowSnackbar("Category deleted successfully! 🗑️"))
-            } catch (e: Exception) {
-                _eventFlow.emit(CategoryListEvent.ShowSnackbar("Failed to delete category: ${e.message}"))
-            } finally {
-                _isDeletingCategory.value = false
-            }
-        }
-    }
-    
-    /**
-     * Toggle category active status
-     */
-    fun toggleCategoryStatus(categoryId: Int) {
-        viewModelScope.launch {
-            try {
-                repository.toggleCategoryStatus(categoryId)
-                _eventFlow.emit(CategoryListEvent.ShowSnackbar("Category status updated! 🔄"))
-            } catch (e: Exception) {
-                _eventFlow.emit(CategoryListEvent.ShowSnackbar("Failed to update status: ${e.message}"))
-            }
-        }
-    }
+    // Categories are now read-only for users (managed globally by admin)
+    // Removed: addCategory, updateCategory, deleteCategory, toggleCategoryStatus methods
     
     /**
      * Refresh categories
@@ -181,9 +88,8 @@ sealed class CategoryListState {
 
 /**
  * Category List Events
- * Like Vue.js event system (toast notifications, navigation)
+ * Like Vue.js event system (simplified for read-only categories)
  */
 sealed class CategoryListEvent {
     data class ShowSnackbar(val message: String) : CategoryListEvent()
-    data class NavigateToEdit(val categoryId: Int) : CategoryListEvent()
 }

@@ -11,36 +11,57 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Today
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material3.*
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.spenttracker.data.local.ExpenseDatabase
-import com.example.spenttracker.data.repository.ExpenseRepositoryImpl
-import com.example.spenttracker.data.repository.CategoryRepositoryImpl
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.spenttracker.domain.model.Expense
 import com.example.spenttracker.domain.model.Category
-import androidx.compose.ui.platform.LocalContext
+import com.example.spenttracker.presentation.expenses.DateFilterType
+import com.example.spenttracker.util.ExportFormat
 import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.launch
 import com.example.spenttracker.presentation.theme.ShadcnButton
 import com.example.spenttracker.presentation.theme.ShadcnTextField
 import com.example.spenttracker.presentation.theme.ShadcnButtonVariant
 import com.example.spenttracker.presentation.theme.ShadcnButtonSize
+import com.example.spenttracker.data.sync.SyncScheduler
+import com.example.spenttracker.presentation.dashboard.SyncSchedulerEntryPoint
+import com.example.spenttracker.presentation.categories.CategoryViewModel
 import java.text.SimpleDateFormat
 import java.text.NumberFormat
 import java.time.LocalDate
+import java.time.YearMonth
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.*
 
 /**
@@ -96,28 +117,47 @@ fun ExpensesScreen(
     onNavigateToDashboard: () -> Unit = {},
     onMenuClick: () -> Unit = {}
 ) {
-    // Create ViewModel with repository
+    // Use Hilt dependency injection - Like Laravel's constructor injection
+    // @HiltViewModel automatically provides all dependencies
+    val viewModel: ExpensesViewModel = hiltViewModel()
+    val categoryViewModel: CategoryViewModel = hiltViewModel()
+    
+    // Get sync scheduler for manual sync after adding/editing expenses
     val context = LocalContext.current
-    val database = ExpenseDatabase.getDatabase(context)
-    val repository = ExpenseRepositoryImpl(database.expenseDao())
-    val viewModel: ExpensesViewModel = viewModel { ExpensesViewModel(repository) }
+    val syncScheduler = remember { 
+        val app = context.applicationContext as com.example.spenttracker.SpentTrackerApplication
+        dagger.hilt.android.EntryPointAccessors.fromApplication(
+            app,
+            SyncSchedulerEntryPoint::class.java
+        ).syncScheduler()
+    }
     
-    // Create category repository for category dropdown
-    val categoryRepository = CategoryRepositoryImpl(database.categoryDao())
-    val activeCategories by categoryRepository.getActiveCategories().collectAsState(initial = emptyList())
-    
-    // Form state
-    var description by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf<Category?>(null) }
-    
+    // Get categories from CategoryViewModel
+    val activeCategories by categoryViewModel.categories.collectAsState()
+
+    // Month navigation state
+    var selectedMonth by remember { mutableStateOf(YearMonth.now()) }
+
+    // Form state is now managed inside the AddExpenseDialog
+
     // Delete confirmation state
     var expenseToDelete by remember { mutableStateOf<Expense?>(null) }
     
     // Edit dialog state
     var expenseToEdit by remember { mutableStateOf<Expense?>(null) }
     
-    
+    // Add expense dialog state
+    var showAddExpenseDialog by remember { mutableStateOf(false) }
+
+    // Export dialog state
+    var showExportDialog by remember { mutableStateOf(false) }
+
+    // Snackbar host state for showing messages
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Coroutine scope for async operations
+    val scope = rememberCoroutineScope()
+
     // Collect UI state from ViewModel
     val state by viewModel.state.collectAsState()
     val isAddingExpense by viewModel.isAddingExpense.collectAsState()
@@ -131,6 +171,13 @@ fun ExpensesScreen(
     // Collect date filter state
     val selectedDate by viewModel.selectedDate.collectAsState()
     val showAllDates by viewModel.showAllDates.collectAsState()
+    val dateFilterType by viewModel.dateFilterType.collectAsState()
+    val filteredExpenses by viewModel.filteredExpenses.collectAsState()
+
+    // Update expenses when selected month changes
+    LaunchedEffect(selectedMonth) {
+        viewModel.filterByMonth(selectedMonth)
+    }
     
     // Handle events (like snackbars)
     LaunchedEffect(key1 = true) {
@@ -168,17 +215,31 @@ fun ExpensesScreen(
                     }
                 },
                 actions = {
-                    // Dark mode toggle switch
-                    Switch(
-                        checked = darkTheme,
-                        onCheckedChange = { onDarkThemeToggle() },
-                        modifier = Modifier
-                            .padding(end = 8.dp)
-                            .size(32.dp)
-                    )
+                    // Export button
+                    IconButton(onClick = { showExportDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.FileDownload,
+                            contentDescription = "Export Expenses"
+                        )
+                    }
                 }
             )
-        }
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = { showAddExpenseDialog = true },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add Expense"
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Add Expense")
+            }
+        },
+        floatingActionButtonPosition = FabPosition.End
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -188,41 +249,44 @@ fun ExpensesScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp),
             userScrollEnabled = true // Explicitly enable scrolling
         ) {
-            // Add Expense Form
+            // Month Navigation Header
             item {
-                AddExpenseForm(
-                    description = description,
-                    amount = amount,
-                    selectedCategory = selectedCategory,
-                    categories = activeCategories,
-                    onDescriptionChange = { description = it },
-                    onAmountChange = { newValue ->
-                        val numericValue = extractNumericValue(newValue)
-                        amount = numericValue
-                    },
-                    onCategoryChange = { selectedCategory = it },
-                    onAddExpense = {
-                        // Add expense using ViewModel
-                        val amountValue = amount.toDoubleOrNull()
-                        if (description.isNotBlank() && amountValue != null && amountValue > 0) {
-                            viewModel.addExpense(description.trim(), amountValue, selectedCategory?.id)
-                            description = ""
-                            amount = ""
-                            selectedCategory = null
-                        }
-                    },
-                    isLoading = isAddingExpense
+                MonthNavigationHeader(
+                    selectedMonth = selectedMonth,
+                    onPreviousMonth = { selectedMonth = selectedMonth.minusMonths(1) },
+                    onNextMonth = { selectedMonth = selectedMonth.plusMonths(1) },
+                    onResetToCurrentMonth = { selectedMonth = YearMonth.now() }
                 )
             }
-            
+
             // Date Filter
             item {
                 DateFilterControls(
                     selectedDate = selectedDate,
-                    showAllDates = showAllDates,
+                    dateFilterType = dateFilterType,
                     onDateSelected = { date -> viewModel.filterByDate(date) },
-                    onShowAllDates = { viewModel.showAllDates() },
-                    onTodaySelected = { viewModel.filterByToday() }
+                    onShowAllDates = { viewModel.showAllExpenses() },
+                    onTodaySelected = { viewModel.showTodayExpenses() },
+                    onThisMonthSelected = { viewModel.showThisMonthExpenses() }
+                )
+            }
+            
+            // Expenses List Header
+            item {
+                Text(
+                    text = "Recent Expenses",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                )
+            }
+            
+            // Total sum display
+            item {
+                TotalSumCard(
+                    filteredExpenses = filteredExpenses,
+                    filterType = dateFilterType
                 )
             }
             
@@ -242,16 +306,6 @@ fun ExpensesScreen(
                 }
                 
                 is ExpenseListState.Success -> {
-                    // Expenses List Header
-                    item {
-                        Text(
-                            text = "Recent Expenses",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(top = 16.dp, bottom = 12.dp)
-                        )
-                    }
                     
                     if (currentState.expenses.isEmpty()) {
                         item {
@@ -325,6 +379,14 @@ fun ExpensesScreen(
                                 )
                             }
                         }
+                        
+                        // Total sum display below the list
+                        item {
+                            TotalSumCard(
+                                filteredExpenses = filteredExpenses,
+                                filterType = dateFilterType
+                            )
+                        }
                     }
                 }
                 
@@ -395,6 +457,26 @@ fun ExpensesScreen(
         )
     }
     
+    // Add expense dialog
+    if (showAddExpenseDialog) {
+        AddExpenseDialog(
+            categories = activeCategories,
+            onDismiss = { 
+                showAddExpenseDialog = false
+            },
+            onSave = { newExpense ->
+                viewModel.addExpense(
+                    newExpense.description, 
+                    newExpense.amount, 
+                    newExpense.categoryId, 
+                    newExpense.date
+                )
+                showAddExpenseDialog = false
+            },
+            isLoading = isAddingExpense
+        )
+    }
+    
     // Edit expense dialog
     expenseToEdit?.let { expense ->
         EditExpenseDialog(
@@ -404,6 +486,28 @@ fun ExpensesScreen(
             onSave = { updatedExpense ->
                 viewModel.updateExpense(updatedExpense)
                 expenseToEdit = null
+            }
+        )
+    }
+
+    // Export dialog
+    if (showExportDialog) {
+        ExportDialog(
+            onDismiss = { showExportDialog = false },
+            onExport = { format ->
+                scope.launch {
+                    viewModel.exportExpenses(format).collect { result ->
+                        result.fold(
+                            onSuccess = { file ->
+                                snackbarHostState.showSnackbar("Exported to: ${file.absolutePath}")
+                                showExportDialog = false
+                            },
+                            onFailure = { error ->
+                                snackbarHostState.showSnackbar("Export failed: ${error.message}")
+                            }
+                        )
+                    }
+                }
             }
         )
     }
@@ -420,10 +524,12 @@ fun AddExpenseForm(
     description: String,
     amount: String,
     selectedCategory: Category?,
+    selectedDate: LocalDate,
     categories: List<Category>,
     onDescriptionChange: (String) -> Unit,
     onAmountChange: (String) -> Unit,
     onCategoryChange: (Category?) -> Unit,
+    onDateChange: (LocalDate) -> Unit,
     onAddExpense: () -> Unit,
     isLoading: Boolean = false
 ) {
@@ -487,6 +593,13 @@ fun AddExpenseForm(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            )
+            
+            // Date picker field
+            DatePickerField(
+                selectedDate = selectedDate,
+                onDateChange = onDateChange,
+                modifier = Modifier.fillMaxWidth()
             )
             
             // Category dropdown
@@ -650,10 +763,11 @@ fun EditExpenseDialog(
     // Dialog form state
     var description by remember { mutableStateOf(expense.description) }
     var amount by remember { mutableStateOf(expense.amount.toString()) }
-    var selectedCategory by remember { 
-        mutableStateOf(categories.find { it.id == expense.categoryId }) 
+    var selectedCategory by remember {
+        mutableStateOf(categories.find { it.id == expense.categoryId })
     }
-    
+    var editSelectedDate by remember { mutableStateOf(expense.date) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Edit Expense") },
@@ -666,28 +780,34 @@ fun EditExpenseDialog(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text("Description") },
-                    placeholder = { 
+                    placeholder = {
                     Text(
                         "e.g., Lunch, Gas, Groceries",
                         style = MaterialTheme.typography.bodySmall
-                    ) 
+                    )
                 },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
-                
+
                 // Amount field
                 ShadcnTextField(
-                    value = if (amount.isNotEmpty()) formatCurrencyInput(amount) else "",
+                    value = amount,
                     onValueChange = { newValue ->
-                        amount = extractNumericValue(newValue)
+                        // Only allow digits and single decimal point
+                        val filtered = newValue.filter { it.isDigit() || it == '.' }
+                        // Prevent multiple decimal points
+                        val decimalCount = filtered.count { it == '.' }
+                        if (decimalCount <= 1) {
+                            amount = filtered
+                        }
                     },
                     label = { Text("Amount") },
-                    placeholder = { 
+                    placeholder = {
                     Text(
                         "0.00",
                         style = MaterialTheme.typography.bodySmall
-                    ) 
+                    )
                 },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
@@ -701,6 +821,13 @@ fun EditExpenseDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                )
+                
+                // Date picker field
+                DatePickerField(
+                    selectedDate = editSelectedDate,
+                    onDateChange = { editSelectedDate = it },
+                    modifier = Modifier.fillMaxWidth()
                 )
                 
                 // Category dropdown
@@ -720,7 +847,8 @@ fun EditExpenseDialog(
                         val updatedExpense = expense.copy(
                             description = description.trim(),
                             amount = amountValue,
-                            categoryId = selectedCategory?.id
+                            categoryId = selectedCategory?.id,
+                            date = editSelectedDate
                         )
                         onSave(updatedExpense)
                     }
@@ -730,6 +858,137 @@ fun EditExpenseDialog(
                 size = ShadcnButtonSize.Default
             ) {
                 Text("Save")
+            }
+        },
+        dismissButton = {
+            ShadcnButton(
+                onClick = onDismiss,
+                variant = ShadcnButtonVariant.Outline,
+                size = ShadcnButtonSize.Default
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+/**
+ * Add Expense Dialog Component
+ *
+ * Modal dialog for adding new expenses with form validation
+ */
+@Composable
+fun AddExpenseDialog(
+    categories: List<Category>,
+    onDismiss: () -> Unit,
+    onSave: (Expense) -> Unit,
+    isLoading: Boolean = false
+) {
+    // Dialog form state
+    var description by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf<Category?>(null) }
+    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add New Expense") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Description field
+                ShadcnTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    placeholder = {
+                        Text(
+                            "e.g., Lunch, Gas, Groceries",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                // Amount field
+                ShadcnTextField(
+                    value = amount,
+                    onValueChange = { newValue ->
+                        // Only allow digits and single decimal point
+                        val filtered = newValue.filter { it.isDigit() || it == '.' }
+                        // Prevent multiple decimal points
+                        val decimalCount = filtered.count { it == '.' }
+                        if (decimalCount <= 1) {
+                            amount = filtered
+                        }
+                    },
+                    label = { Text("Amount") },
+                    placeholder = {
+                        Text(
+                            "0.00",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Decimal
+                    ),
+                    leadingIcon = {
+                        Text(
+                            text = "₦",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                )
+                
+                // Date picker field
+                DatePickerField(
+                    selectedDate = selectedDate,
+                    onDateChange = { selectedDate = it },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                // Category dropdown
+                CategoryDropdown(
+                    selectedCategory = selectedCategory,
+                    categories = categories,
+                    onCategorySelected = { selectedCategory = it },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            ShadcnButton(
+                onClick = {
+                    val amountValue = amount.toDoubleOrNull()
+                    if (description.isNotBlank() && amountValue != null && amountValue > 0) {
+                        val newExpense = Expense(
+                            id = 0, // Will be auto-generated
+                            description = description.trim(),
+                            amount = amountValue,
+                            date = selectedDate,
+                            categoryId = selectedCategory?.id
+                        )
+                        onSave(newExpense)
+                    }
+                },
+                enabled = description.isNotBlank() && amount.toDoubleOrNull() != null && amount.toDoubleOrNull()!! > 0 && !isLoading,
+                variant = ShadcnButtonVariant.Default,
+                size = ShadcnButtonSize.Default
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(if (isLoading) "Adding..." else "Add Expense")
             }
         },
         dismissButton = {
@@ -913,15 +1172,102 @@ fun PageSizeSelector(
 }
 
 /**
+ * Month Navigation Header Component
+ */
+@Composable
+fun MonthNavigationHeader(
+    selectedMonth: YearMonth,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onResetToCurrentMonth: () -> Unit
+) {
+    val isCurrentMonth = selectedMonth == YearMonth.now()
+    val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy")
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Previous Month Button
+            IconButton(
+                onClick = onPreviousMonth,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ChevronLeft,
+                    contentDescription = "Previous Month",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+
+            // Month Display with Reset Button
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = selectedMonth.format(monthFormatter),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+
+                if (!isCurrentMonth) {
+                    TextButton(
+                        onClick = onResetToCurrentMonth,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Today,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Current Month",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
+            // Next Month Button
+            IconButton(
+                onClick = onNextMonth,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Next Month",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+    }
+}
+
+/**
  * Date Filter Controls Component
  */
 @Composable
 fun DateFilterControls(
     selectedDate: LocalDate,
-    showAllDates: Boolean,
+    dateFilterType: DateFilterType,
     onDateSelected: (LocalDate) -> Unit,
     onShowAllDates: () -> Unit,
-    onTodaySelected: () -> Unit
+    onTodaySelected: () -> Unit,
+    onThisMonthSelected: () -> Unit
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
     Card(
@@ -955,16 +1301,25 @@ fun DateFilterControls(
                 // All dates button
                 ShadcnButton(
                     onClick = onShowAllDates,
-                    variant = if (showAllDates) ShadcnButtonVariant.Default else ShadcnButtonVariant.Outline,
+                    variant = if (dateFilterType == DateFilterType.ALL) ShadcnButtonVariant.Default else ShadcnButtonVariant.Outline,
                     size = ShadcnButtonSize.Small
                 ) {
                     Text("All")
                 }
                 
+                // This Month button (default)
+                ShadcnButton(
+                    onClick = onThisMonthSelected,
+                    variant = if (dateFilterType == DateFilterType.THIS_MONTH) ShadcnButtonVariant.Default else ShadcnButtonVariant.Outline,
+                    size = ShadcnButtonSize.Small
+                ) {
+                    Text("This Month")
+                }
+                
                 // Today button
                 ShadcnButton(
                     onClick = onTodaySelected,
-                    variant = if (!showAllDates && selectedDate == LocalDate.now()) 
+                    variant = if (dateFilterType == DateFilterType.TODAY) 
                         ShadcnButtonVariant.Default else ShadcnButtonVariant.Outline,
                     size = ShadcnButtonSize.Small
                 ) {
@@ -974,7 +1329,7 @@ fun DateFilterControls(
                 // Custom date picker button
                 ShadcnButton(
                     onClick = { showDatePicker = true },
-                    variant = if (!showAllDates && selectedDate != LocalDate.now()) 
+                    variant = if (dateFilterType == DateFilterType.CUSTOM_DATE) 
                         ShadcnButtonVariant.Default else ShadcnButtonVariant.Outline,
                     size = ShadcnButtonSize.Small
                 ) {
@@ -983,13 +1338,27 @@ fun DateFilterControls(
             }
             
             // Current filter info
-            if (!showAllDates) {
-                Text(
-                    text = "Showing expenses for: ${selectedDate.format(java.time.format.DateTimeFormatter.ofPattern("MMM dd, yyyy"))}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
+            if (dateFilterType != DateFilterType.ALL) {
+                val filterText = when (dateFilterType) {
+                    DateFilterType.TODAY -> {
+                        val todayFormatted = LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("MMM dd, yyyy"))
+                        "Showing expenses for: $todayFormatted"
+                    }
+                    DateFilterType.THIS_MONTH -> {
+                        val currentMonth = LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy"))
+                        "Showing expenses for: $currentMonth"
+                    }
+                    DateFilterType.CUSTOM_DATE -> "Showing expenses for: ${selectedDate.format(java.time.format.DateTimeFormatter.ofPattern("MMM dd, yyyy"))}"
+                    else -> ""
+                }
+                if (filterText.isNotEmpty()) {
+                    Text(
+                        text = filterText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
             }
         }
     }
@@ -1004,6 +1373,69 @@ fun DateFilterControls(
             onDismiss = { showDatePicker = false },
             initialDate = selectedDate
         )
+    }
+}
+
+/**
+ * Total Sum Card Component
+ * 
+ * Displays the total amount for the current filter
+ */
+@Composable
+fun TotalSumCard(
+    filteredExpenses: List<Expense>,
+    filterType: DateFilterType
+) {
+    val totalAmount = filteredExpenses.sumOf { it.amount }
+    
+    val filterTitle = when (filterType) {
+        DateFilterType.ALL -> "Total (All Time)"
+        DateFilterType.TODAY -> {
+            val todayFormatted = LocalDate.now().format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))
+            "Total ($todayFormatted)"
+        }
+        DateFilterType.THIS_MONTH -> {
+            val currentMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy"))
+            "Total ($currentMonth)"
+        }
+        DateFilterType.CUSTOM_DATE -> "Total (Selected Date)"
+        DateFilterType.CUSTOM_MONTH -> "Total (Selected Month)"
+    }
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = filterTitle,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontWeight = FontWeight.Medium
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            Text(
+                text = formatCurrency(totalAmount),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Text(
+                text = "${filteredExpenses.size} expense${if (filteredExpenses.size != 1) "s" else ""}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+            )
+        }
     }
 }
 
@@ -1221,6 +1653,130 @@ fun CategoryDropdown(
             }
         }
     }
+}
+
+/**
+ * Date Picker Field Component
+ * 
+ * Material Design 3 date picker with field-like appearance
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DatePickerField(
+    selectedDate: LocalDate,
+    onDateChange: (LocalDate) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showDatePicker by remember { mutableStateOf(false) }
+    
+    // Format the date for display
+    val dateFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy")
+    val displayDate = selectedDate.format(dateFormatter)
+    
+    // Date picker field that looks like other form fields
+    OutlinedTextField(
+        value = displayDate,
+        onValueChange = { }, // Read-only field
+        label = { Text("Date") },
+        modifier = modifier,
+        readOnly = true,
+        trailingIcon = {
+            IconButton(onClick = { showDatePicker = true }) {
+                Icon(
+                    imageVector = Icons.Default.DateRange,
+                    contentDescription = "Select date"
+                )
+            }
+        },
+        placeholder = { 
+            Text(
+                "Select date",
+                style = MaterialTheme.typography.bodySmall
+            ) 
+        },
+        colors = OutlinedTextFieldDefaults.colors()
+    )
+    
+    // Date picker dialog
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        )
+        
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                ShadcnButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val newDate = Instant.ofEpochMilli(millis)
+                                .atZone(ZoneId.systemDefault())
+                                .toLocalDate()
+                            onDateChange(newDate)
+                        }
+                        showDatePicker = false
+                    },
+                    variant = ShadcnButtonVariant.Default,
+                    size = ShadcnButtonSize.Default
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                ShadcnButton(
+                    onClick = { showDatePicker = false },
+                    variant = ShadcnButtonVariant.Outline,
+                    size = ShadcnButtonSize.Default
+                ) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+}
+
+/**
+ * Export Dialog Component
+ */
+@Composable
+fun ExportDialog(
+    onDismiss: () -> Unit,
+    onExport: (ExportFormat) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Export Expenses") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Choose export format:")
+                Spacer(modifier = Modifier.height(8.dp))
+
+                ExportFormat.values().forEach { format ->
+                    TextButton(
+                        onClick = { onExport(format) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(format.name)
+                            Icon(Icons.Default.FileDownload, null)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 /**

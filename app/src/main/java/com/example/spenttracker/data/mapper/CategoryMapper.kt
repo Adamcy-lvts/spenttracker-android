@@ -14,7 +14,7 @@ import com.example.spenttracker.domain.model.Category
  */
 fun CategoryEntity.toDomain(): Category {
     return Category(
-        id = this.id,
+        id = this.id.toInt(), // Convert Long to Int for domain model
         name = this.name,
         color = this.color,
         description = this.description,
@@ -26,16 +26,28 @@ fun CategoryEntity.toDomain(): Category {
 
 /**
  * Convert Category domain model to CategoryEntity
+ * For new categories (id == 0), assigns temporary negative ID
  */
 fun Category.toEntity(): CategoryEntity {
+    // Generate temporary negative ID for new categories
+    val categoryId = if (this.id == 0) {
+        -(System.currentTimeMillis() % 1000000) // Temporary negative ID
+    } else {
+        this.id.toLong() // Use existing ID
+    }
+    
     return CategoryEntity(
-        id = this.id,
+        id = categoryId,
         name = this.name,
         color = this.color,
         description = this.description,
         isActive = this.isActive,
         icon = this.icon,
-        updatedAt = System.currentTimeMillis()
+        updatedAt = System.currentTimeMillis(),
+        // New categories need sync by default
+        syncStatus = com.example.spenttracker.data.local.entity.CategorySyncStatus.PENDING.name,
+        needsSync = true,
+        lastSyncAt = null
     )
 }
 
@@ -44,7 +56,7 @@ fun Category.toEntity(): CategoryEntity {
  */
 fun CategoryDao.CategoryWithExpenseCount.toDomain(): Category {
     return Category(
-        id = this.id,
+        id = this.id.toInt(), // Convert Long to Int for domain model
         name = this.name,
         color = this.color,
         description = this.description,

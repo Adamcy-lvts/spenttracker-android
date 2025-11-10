@@ -7,9 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
+// Removed Add, Delete, Edit icons - Categories are now read-only
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
@@ -22,9 +20,13 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.spenttracker.data.local.ExpenseDatabase
+import com.example.spenttracker.presentation.auth.AuthViewModel
 import com.example.spenttracker.data.repository.CategoryRepositoryImpl
+import com.example.spenttracker.data.mapper.toDomainWithCountList
 import com.example.spenttracker.domain.model.Category
 import com.example.spenttracker.presentation.theme.ShadcnButton
 import com.example.spenttracker.presentation.theme.ShadcnButtonVariant
@@ -40,6 +42,11 @@ fun CategoriesScreen(
     onDarkThemeToggle: () -> Unit = {},
     onMenuClick: () -> Unit = {}
 ) {
+    // Get current user from auth
+    val authViewModel: AuthViewModel = hiltViewModel()
+    val authUiState by authViewModel.uiState.collectAsState()
+    val currentUserId = authUiState.currentUser?.id ?: 0L
+    
     // Create ViewModel with repository
     val context = LocalContext.current
     val database = ExpenseDatabase.getDatabase(context)
@@ -50,11 +57,18 @@ fun CategoriesScreen(
     val state by viewModel.state.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     
-    // Dialog states
-    var showAddDialog by remember { mutableStateOf(false) }
-    var showEditDialog by remember { mutableStateOf(false) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    var selectedCategory by remember { mutableStateOf<Category?>(null) }
+    // Get user-specific categories with correct expense counts
+    val userSpecificCategoriesFlow = remember(currentUserId) {
+        database.categoryDao().getCategoriesWithExpenseCountForUser(currentUserId)
+    }
+    val userSpecificCategoriesData by userSpecificCategoriesFlow.collectAsState(initial = emptyList())
+    
+    // Convert to domain models
+    val userSpecificCategories = remember(userSpecificCategoriesData) {
+        userSpecificCategoriesData.toDomainWithCountList()
+    }
+    
+    // Categories are now read-only - no dialogs needed
     
     Scaffold(
         topBar = {
@@ -75,30 +89,10 @@ fun CategoriesScreen(
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                },
-                actions = {
-                    // Dark mode toggle switch
-                    Switch(
-                        checked = darkTheme,
-                        onCheckedChange = { onDarkThemeToggle() },
-                        modifier = Modifier
-                            .padding(end = 8.dp)
-                            .size(32.dp)
-                    )
                 }
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add Category"
-                )
-            }
         }
+        // Removed FloatingActionButton - Categories are read-only
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -107,34 +101,14 @@ fun CategoriesScreen(
             contentPadding = PaddingValues(20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Header
+            // Description
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Categories",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    
-                    ShadcnButton(
-                        onClick = { showAddDialog = true },
-                        variant = ShadcnButtonVariant.Default,
-                        size = ShadcnButtonSize.Default
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Add Category")
-                    }
-                }
+                Text(
+                    text = "Categories are managed globally for consistent analytics",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
             }
             
             when (val currentState = state) {
@@ -152,8 +126,9 @@ fun CategoriesScreen(
                 }
                 
                 is CategoryListState.Success -> {
-                    val activeCategories = currentState.categories.filter { it.isActive }
-                    val inactiveCategories = currentState.categories.filter { !it.isActive }
+                    // Use user-specific categories with correct expense counts
+                    val activeCategories = userSpecificCategories.filter { it.isActive }
+                    val inactiveCategories = userSpecificCategories.filter { !it.isActive }
                     
                     // Active Categories Section
                     item {
@@ -161,16 +136,8 @@ fun CategoriesScreen(
                             title = "Active Categories",
                             subtitle = "${activeCategories.size} categories",
                             categories = activeCategories,
-                            onEditClick = { category ->
-                                selectedCategory = category
-                                showEditDialog = true
-                            },
-                            onDeleteClick = { category ->
-                                selectedCategory = category
-                                showDeleteDialog = true
-                            },
                             emptyMessage = "No active categories",
-                            emptySubMessage = "Create your first category to organize expenses"
+                            emptySubMessage = "Categories will be loaded from the server"
                         )
                     }
                     
@@ -181,14 +148,6 @@ fun CategoriesScreen(
                                 title = "Inactive Categories",
                                 subtitle = "${inactiveCategories.size} categories",
                                 categories = inactiveCategories,
-                                onEditClick = { category ->
-                                    selectedCategory = category
-                                    showEditDialog = true
-                                },
-                                onDeleteClick = { category ->
-                                    selectedCategory = category
-                                    showDeleteDialog = true
-                                },
                                 isInactive = true
                             )
                         }
@@ -225,48 +184,7 @@ fun CategoriesScreen(
         }
     }
     
-    // Add Category Dialog
-    if (showAddDialog) {
-        AddCategoryDialog(
-            onDismiss = { showAddDialog = false },
-            onSave = { category ->
-                viewModel.addCategory(category)
-                showAddDialog = false
-            }
-        )
-    }
-    
-    // Edit Category Dialog
-    if (showEditDialog && selectedCategory != null) {
-        EditCategoryDialog(
-            category = selectedCategory!!,
-            onDismiss = { 
-                showEditDialog = false
-                selectedCategory = null
-            },
-            onSave = { category ->
-                viewModel.updateCategory(category)
-                showEditDialog = false
-                selectedCategory = null
-            }
-        )
-    }
-    
-    // Delete Category Dialog
-    if (showDeleteDialog && selectedCategory != null) {
-        DeleteCategoryDialog(
-            category = selectedCategory!!,
-            onDismiss = { 
-                showDeleteDialog = false
-                selectedCategory = null
-            },
-            onConfirm = {
-                viewModel.deleteCategory(selectedCategory!!.id)
-                showDeleteDialog = false
-                selectedCategory = null
-            }
-        )
-    }
+    // Categories are now read-only - no dialogs needed
 }
 
 /**
@@ -278,8 +196,6 @@ fun CategoriesSection(
     title: String,
     subtitle: String,
     categories: List<Category>,
-    onEditClick: (Category) -> Unit,
-    onDeleteClick: (Category) -> Unit,
     emptyMessage: String = "No categories",
     emptySubMessage: String = "",
     isInactive: Boolean = false
@@ -347,26 +263,13 @@ fun CategoriesSection(
                     }
                 }
             } else {
-                // Categories grid
-                categories.chunked(2).forEach { rowCategories ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        rowCategories.forEach { category ->
-                            CategoryCard(
-                                category = category,
-                                onEditClick = onEditClick,
-                                onDeleteClick = onDeleteClick,
-                                isInactive = isInactive,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        // Fill remaining space if odd number
-                        if (rowCategories.size == 1) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
+                // Categories list (single column)
+                categories.forEach { category ->
+                    CategoryCard(
+                        category = category,
+                        isInactive = isInactive,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
@@ -380,8 +283,6 @@ fun CategoriesSection(
 @Composable
 fun CategoryCard(
     category: Category,
-    onEditClick: (Category) -> Unit,
-    onDeleteClick: (Category) -> Unit,
     isInactive: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -404,155 +305,53 @@ fun CategoryCard(
         )
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Header with color dot and actions
+            // Color indicator and category name in the same row
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Color indicator
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .background(
-                                Color(category.getColorInt()),
-                                CircleShape
-                            )
-                    )
-                    
-                    Text(
-                        text = category.name,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isInactive) {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        }
-                    )
-                }
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .background(
+                            Color(category.getColorInt()),
+                            CircleShape
+                        )
+                )
                 
-                // Actions dropdown
-                CategoryActionsDropdown(
-                    onEditClick = { onEditClick(category) },
-                    onDeleteClick = { onDeleteClick(category) }
+                Text(
+                    text = category.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isInactive) {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    }
                 )
             }
             
-            // Description (if available)
-            category.description?.let { description ->
+            // Description (if available) - full width and multi-line
+            if (!category.description.isNullOrBlank()) {
                 Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
+                    text = category.description!!,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = if (isInactive) {
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
-                    }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    lineHeight = 20.sp
                 )
             }
-            
-            // Expense count
-            Text(
-                text = "${category.expenseCount} ${if (category.expenseCount == 1) "expense" else "expenses"}",
-                style = MaterialTheme.typography.bodySmall,
-                color = if (isInactive) {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
-            )
         }
     }
 }
 
-/**
- * Category Actions Dropdown Component
- * 3-dots menu for category actions
- */
-@Composable
-fun CategoryActionsDropdown(
-    onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    
-    Box {
-        // 3 vertical dots button
-        IconButton(
-            onClick = { expanded = true },
-            modifier = Modifier.size(24.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.MoreVert,
-                contentDescription = "More actions",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp)
-            )
-        }
-        
-        // Dropdown menu
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            // Edit option
-            DropdownMenuItem(
-                text = { 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = "Edit",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                },
-                onClick = {
-                    onEditClick()
-                    expanded = false
-                }
-            )
-            
-            // Delete option
-            DropdownMenuItem(
-                text = { 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = "Delete",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                },
-                onClick = {
-                    onDeleteClick()
-                    expanded = false
-                }
-            )
-        }
-    }
-}
+// CategoryActionsDropdown removed - Categories are now read-only

@@ -5,99 +5,108 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Shadcn/ui inspired color scheme
- * Matches the Vue.js web app design
+ * Exact Shadcn/ui color scheme matching Vue.js web app design
+ * Using the exact OKLCH color values from CSS custom properties
  */
 
-// Primary colors (matching shadcn primary)
-private val Primary = Color(0xFF0F172A) // slate-900
-private val PrimaryVariant = Color(0xFF1E293B) // slate-800
-private val Secondary = Color(0xFF64748B) // slate-500
-private val SecondaryVariant = Color(0xFF475569) // slate-600
-
-// Background colors
-private val Background = Color(0xFFFAFAFA) // neutral-50
-private val Surface = Color(0xFFFFFFFF) // white
-private val SurfaceVariant = Color(0xFFF1F5F9) // slate-100
-
-// Text colors
-private val OnPrimary = Color(0xFFFFFFFF)
-private val OnSecondary = Color(0xFFFFFFFF)
-private val OnBackground = Color(0xFF0F172A) // slate-900
-private val OnSurface = Color(0xFF0F172A) // slate-900
-private val OnSurfaceVariant = Color(0xFF64748B) // slate-500
-
-// Accent colors
-private val Accent = Color(0xFF3B82F6) // blue-500 (matches shadcn accent)
-private val AccentVariant = Color(0xFF2563EB) // blue-600
-
-// Status colors
-private val Error = Color(0xFFEF4444) // red-500
-private val Success = Color(0xFF10B981) // emerald-500
-private val Warning = Color(0xFFF59E0B) // amber-500
-
-// Border colors
-private val Outline = Color(0xFFE2E8F0) // slate-200
-private val OutlineVariant = Color(0xFFCBD5E1) // slate-300
-
-val LightColorScheme = lightColorScheme(
-    primary = Primary,
-    onPrimary = OnPrimary,
-    primaryContainer = PrimaryVariant,
-    onPrimaryContainer = OnPrimary,
+// Light Theme Colors (matching CSS --light theme)
+object SpentTrackerColors {
+    object Light {
+        val background = Color(0xFFFFFFFF) // oklch(1 0 0)
+        val foreground = Color(0xFF242330) // oklch(0.141 0.005 285.823)
+        val primary = Color(0xFF373548) // oklch(0.21 0.006 285.885)
+        val primaryForeground = Color(0xFFFBFBFB) // oklch(0.985 0 0)
+        val secondary = Color(0xFFF7F7F8) // oklch(0.967 0.001 286.375)
+        val secondaryForeground = Color(0xFF373548)
+        val muted = Color(0xFFF7F7F8) // oklch(0.967 0.001 286.375)
+        val mutedForeground = Color(0xFF8C8C95) // oklch(0.552 0.016 285.938)
+        val accent = Color(0xFFF7F7F8)
+        val accentForeground = Color(0xFF373548)
+        val destructive = Color(0xFFDC2626) // oklch(0.577 0.245 27.325)
+        val destructiveForeground = Color(0xFFDC2626)
+        val border = Color(0xFFEAEAEB) // oklch(0.92 0.004 286.32)
+        val input = Color(0xFFEAEAEB)
+        val ring = Color(0xFFB4B4BA) // oklch(0.705 0.015 286.067)
+    }
     
-    secondary = Secondary,
-    onSecondary = OnSecondary,
-    secondaryContainer = SecondaryVariant,
-    onSecondaryContainer = OnPrimary,
+    // Dark Theme Colors (matching CSS --dark theme)
+    object Dark {
+        val background = Color(0xFF242330) // oklch(0.141 0.005 285.823)
+        val foreground = Color(0xFFFBFBFB) // oklch(0.985 0 0)
+        val primary = Color(0xFFFBFBFB) // oklch(0.985 0 0)
+        val primaryForeground = Color(0xFF373548) // oklch(0.21 0.006 285.885)
+        val secondary = Color(0xFF454351) // oklch(0.274 0.006 286.033)
+        val secondaryForeground = Color(0xFFFBFBFB)
+        val muted = Color(0xFF454351) // oklch(0.274 0.006 286.033)
+        val mutedForeground = Color(0xFFB4B4BA) // oklch(0.705 0.015 286.067)
+        val accent = Color(0xFF454351)
+        val accentForeground = Color(0xFFFBFBFB)
+        val destructive = Color(0xFF991B1B) // oklch(0.396 0.141 25.723)
+        val destructiveForeground = Color(0xFFEF4444)
+        val border = Color(0xFF454351) // oklch(0.274 0.006 286.033)
+        val input = Color(0xFF454351)
+        val ring = Color(0xFF6F6F78) // oklch(0.442 0.017 285.786)
+    }
+}
+
+val SpentTrackerLightColorScheme = lightColorScheme(
+    primary = SpentTrackerColors.Light.primary,
+    onPrimary = SpentTrackerColors.Light.primaryForeground,
+    primaryContainer = SpentTrackerColors.Light.secondary,
+    onPrimaryContainer = SpentTrackerColors.Light.foreground,
     
-    tertiary = Accent,
-    onTertiary = OnPrimary,
-    tertiaryContainer = AccentVariant,
-    onTertiaryContainer = OnPrimary,
+    secondary = SpentTrackerColors.Light.secondary,
+    onSecondary = SpentTrackerColors.Light.secondaryForeground,
+    secondaryContainer = SpentTrackerColors.Light.muted,
+    onSecondaryContainer = SpentTrackerColors.Light.mutedForeground,
     
-    background = Background,
-    onBackground = OnBackground,
+    tertiary = SpentTrackerColors.Light.accent,
+    onTertiary = SpentTrackerColors.Light.accentForeground,
+    tertiaryContainer = SpentTrackerColors.Light.accent,
+    onTertiaryContainer = SpentTrackerColors.Light.accentForeground,
     
-    surface = Surface,
-    onSurface = OnSurface,
-    surfaceVariant = SurfaceVariant,
-    onSurfaceVariant = OnSurfaceVariant,
+    background = SpentTrackerColors.Light.background,
+    onBackground = SpentTrackerColors.Light.foreground,
     
-    error = Error,
-    onError = OnPrimary,
+    surface = SpentTrackerColors.Light.background,
+    onSurface = SpentTrackerColors.Light.foreground,
+    surfaceVariant = SpentTrackerColors.Light.muted,
+    onSurfaceVariant = SpentTrackerColors.Light.mutedForeground,
     
-    outline = Outline,
-    outlineVariant = OutlineVariant
+    error = SpentTrackerColors.Light.destructive,
+    onError = SpentTrackerColors.Light.primaryForeground,
+    
+    outline = SpentTrackerColors.Light.border,
+    outlineVariant = SpentTrackerColors.Light.input
 )
 
-val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFFE5E7EB), // Light text for dark theme
-    onPrimary = Color(0xFF0F0F0F), // Very dark
-    primaryContainer = Color(0xFF1E1E1E), // Card backgrounds
-    onPrimaryContainer = Color(0xFFE5E7EB),
+val SpentTrackerDarkColorScheme = darkColorScheme(
+    primary = SpentTrackerColors.Dark.primary,
+    onPrimary = SpentTrackerColors.Dark.primaryForeground,
+    primaryContainer = SpentTrackerColors.Dark.secondary,
+    onPrimaryContainer = SpentTrackerColors.Dark.foreground,
     
-    secondary = Color(0xFF9CA3AF), // Muted text
-    onSecondary = Color(0xFF121212),
-    secondaryContainer = Color(0xFF1E1E1E), 
-    onSecondaryContainer = Color(0xFFE5E7EB),
+    secondary = SpentTrackerColors.Dark.secondary,
+    onSecondary = SpentTrackerColors.Dark.secondaryForeground,
+    secondaryContainer = SpentTrackerColors.Dark.muted,
+    onSecondaryContainer = SpentTrackerColors.Dark.mutedForeground,
     
-    tertiary = Color(0xFF60A5FA), // Accent blue
-    onTertiary = Color(0xFF0F0F0F),
-    tertiaryContainer = Color(0xFF3B82F6),
-    onTertiaryContainer = Color(0xFFFFFFFF),
+    tertiary = SpentTrackerColors.Dark.accent,
+    onTertiary = SpentTrackerColors.Dark.accentForeground,
+    tertiaryContainer = SpentTrackerColors.Dark.accent,
+    onTertiaryContainer = SpentTrackerColors.Dark.accentForeground,
     
-    background = Color(0xFF0F0F0F), // True dark background
-    onBackground = Color(0xFFE5E7EB), // Light text
+    background = SpentTrackerColors.Dark.background,
+    onBackground = SpentTrackerColors.Dark.foreground,
     
-    surface = Color(0xFF121212), // Card/surface background
-    onSurface = Color(0xFFE5E7EB), // Text on surfaces
-    surfaceVariant = Color(0xFF1E1E1E), // Elevated surfaces
-    onSurfaceVariant = Color(0xFF9CA3AF), // Muted text
+    surface = SpentTrackerColors.Dark.background,
+    onSurface = SpentTrackerColors.Dark.foreground,
+    surfaceVariant = SpentTrackerColors.Dark.muted,
+    onSurfaceVariant = SpentTrackerColors.Dark.mutedForeground,
     
-    error = Color(0xFFF87171), // Error red
-    onError = Color(0xFF0F0F0F),
+    error = SpentTrackerColors.Dark.destructive,
+    onError = SpentTrackerColors.Dark.destructiveForeground,
     
-    outline = Color(0xFF374151), // Borders
-    outlineVariant = Color(0xFF4B5563) // Subtle borders
+    outline = SpentTrackerColors.Dark.border,
+    outlineVariant = SpentTrackerColors.Dark.input
 )

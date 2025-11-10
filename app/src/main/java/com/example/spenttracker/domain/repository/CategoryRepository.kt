@@ -40,23 +40,6 @@ interface CategoryRepository {
      */
     suspend fun getCategoryById(id: Int): Category?
     
-    /**
-     * Add new category
-     */
-    suspend fun addCategory(category: Category): Long
-    
-    /**
-     * Update existing category
-     */
-    suspend fun updateCategory(category: Category)
-    
-    /**
-     * Delete category by ID
-     */
-    suspend fun deleteCategory(id: Int)
-    
-    /**
-     * Toggle category active status
-     */
-    suspend fun toggleCategoryStatus(id: Int)
+    // Categories are now read-only for users (managed globally by admin)
+    // User-facing CRUD operations removed for consistent analytics tracking
 }

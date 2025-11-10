@@ -9,8 +9,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+// Font Awesome Icons for beautiful dashboard stats
+import compose.icons.FontAwesomeIcons
+import compose.icons.fontawesomeicons.Solid
+import compose.icons.fontawesomeicons.solid.DollarSign
+import compose.icons.fontawesomeicons.solid.CalendarDay
+import compose.icons.fontawesomeicons.solid.CalendarWeek
+import compose.icons.fontawesomeicons.solid.ArrowUp
+import compose.icons.fontawesomeicons.solid.ArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -18,20 +27,23 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.spenttracker.data.local.ExpenseDatabase
-import com.example.spenttracker.data.repository.ExpenseRepositoryImpl
+import com.example.spenttracker.data.mapper.toDomainList
 import com.example.spenttracker.data.repository.CategoryRepositoryImpl
+import com.example.spenttracker.domain.repository.ExpenseRepository
 import com.example.spenttracker.domain.model.Expense
 import com.example.spenttracker.domain.model.Category
-import com.example.spenttracker.presentation.expenses.ExpensesViewModel
+import com.example.spenttracker.presentation.auth.AuthViewModel
 import com.example.spenttracker.presentation.theme.ShadcnButton
 import com.example.spenttracker.presentation.theme.ShadcnButtonVariant
 import com.example.spenttracker.presentation.theme.ShadcnButtonSize
+import com.example.spenttracker.data.sync.SyncScheduler
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.YearMonth
 import java.util.*
+import kotlinx.coroutines.flow.map
 
 /**
  * Dashboard Screen - Matching the Vue.js design with statistics cards
@@ -44,34 +56,40 @@ fun DashboardScreen(
     onDarkThemeToggle: () -> Unit = {},
     onMenuClick: () -> Unit = {}
 ) {
-    // Create repository for dashboard data (separate from paginated ExpensesViewModel)
+    // Get user context from AuthViewModel
+    val authViewModel: AuthViewModel = hiltViewModel()
+    val authUiState by authViewModel.uiState.collectAsState()
+    val currentUser = authUiState.currentUser
+    
+    // Get sync scheduler for manual sync
     val context = LocalContext.current
-    val database = ExpenseDatabase.getDatabase(context)
-    val repository = ExpenseRepositoryImpl(database.expenseDao())
-    val categoryRepository = CategoryRepositoryImpl(database.categoryDao())
-    
-    // Get ALL expenses directly from repository for dashboard calculations
-    var allExpenses by remember { mutableStateOf<List<Expense>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    
-    // Load all expenses when component starts
-    LaunchedEffect(Unit) {
-        try {
-            repository.getExpenses().collect { expenses ->
-                allExpenses = expenses
-                isLoading = false
-                errorMessage = null
-            }
-        } catch (e: Exception) {
-            errorMessage = e.message ?: "Unknown error"
-            isLoading = false
-        }
+    val syncScheduler = remember { 
+        val app = context.applicationContext as com.example.spenttracker.SpentTrackerApplication
+        dagger.hilt.android.EntryPointAccessors.fromApplication(
+            app,
+            SyncSchedulerEntryPoint::class.java
+        ).syncScheduler()
     }
     
-    // Calculate statistics from ALL expenses (not paginated)
-    val statistics = remember(allExpenses) {
-        calculateStatistics(allExpenses)
+    // Get repository for user-filtered expense data through ExpensesViewModel
+    val expensesViewModel: com.example.spenttracker.presentation.expenses.ExpensesViewModel = hiltViewModel()
+    
+    // Get database access for category data
+    val database = ExpenseDatabase.getDatabase(context)
+    val categoryRepository = CategoryRepositoryImpl(database.categoryDao())
+    
+    // Month navigation state
+    var selectedMonth by remember { mutableStateOf(YearMonth.now()) }
+
+    // Get ALL expenses from ExpensesViewModel (not paginated) for statistics calculation
+    val allExpenses by expensesViewModel.allExpenses.collectAsState()
+    val expensesState by expensesViewModel.state.collectAsState()
+    val isLoading = expensesState is com.example.spenttracker.presentation.expenses.ExpenseListState.Loading
+    val errorMessage = (expensesState as? com.example.spenttracker.presentation.expenses.ExpenseListState.Error)?.message
+
+    // Calculate statistics from ALL expenses based on selected month
+    val statistics = remember(allExpenses, selectedMonth) {
+        calculateStatistics(allExpenses, selectedMonth)
     }
     
     Scaffold(
@@ -93,16 +111,6 @@ fun DashboardScreen(
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                },
-                actions = {
-                    // Dark mode toggle switch
-                    Switch(
-                        checked = darkTheme,
-                        onCheckedChange = { onDarkThemeToggle() },
-                        modifier = Modifier
-                            .padding(end = 8.dp)
-                            .size(32.dp)
-                    )
                 }
             )
         }
@@ -114,41 +122,42 @@ fun DashboardScreen(
             contentPadding = PaddingValues(20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Dashboard Header
+
+            // Month Navigation Header
             item {
-                Text(
-                    text = "Dashboard",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                MonthNavigationHeader(
+                    selectedMonth = selectedMonth,
+                    onPreviousMonth = { selectedMonth = selectedMonth.minusMonths(1) },
+                    onNextMonth = { selectedMonth = selectedMonth.plusMonths(1) },
+                    onResetToCurrentMonth = { selectedMonth = YearMonth.now() }
                 )
             }
-            
+
             // Statistics Cards Row
             item {
-                // Create the statistics cards data HERE (inside @Composable context)
+                // Beautiful stats cards with Font Awesome icons
                 val statsCards = listOf(
                     StatCardData(
                         title = "Total Expenses",
                         value = formatCurrency(statistics.totalExpenses),
                         subtitle = "All time spending",
-                        icon = Icons.Default.ShoppingCart,
-                        iconColor = MaterialTheme.colorScheme.primary
+                        icon = FontAwesomeIcons.Solid.DollarSign, // 💰 Beautiful dollar icon!
+                        iconColor = Color(0xFF16A34A) // Green for money
                     ),
                     StatCardData(
                         title = "This Month",
                         value = formatCurrency(statistics.thisMonth),
                         subtitle = "${statistics.monthlyChangePercent}% from last month",
-                        icon = Icons.Default.DateRange,
+                        icon = FontAwesomeIcons.Solid.CalendarDay, // 📅 Perfect calendar icon!
                         iconColor = if (statistics.monthlyChangePercent >= 0) Color(0xFFEF4444) else Color(0xFF10B981),
-                        trending = if (statistics.monthlyChangePercent >= 0) Icons.Default.Add else Icons.Default.Delete
+                        trending = if (statistics.monthlyChangePercent >= 0) FontAwesomeIcons.Solid.ArrowUp else FontAwesomeIcons.Solid.ArrowDown
                     ),
                     StatCardData(
                         title = "This Week",
                         value = formatCurrency(statistics.thisWeek),
                         subtitle = "Current week spending",
-                        icon = Icons.Default.DateRange,
-                        iconColor = MaterialTheme.colorScheme.secondary
+                        icon = FontAwesomeIcons.Solid.CalendarWeek, // 🗓️ Perfect week calendar icon!
+                        iconColor = Color(0xFF3B82F6) // Blue for weekly stats
                     )
                 )
                 
@@ -168,7 +177,8 @@ fun DashboardScreen(
             item {
                 CategoryBreakdownCard(
                     expenses = allExpenses,
-                    categoryRepository = categoryRepository
+                    categoryRepository = categoryRepository,
+                    selectedMonth = selectedMonth
                 )
             }
             
@@ -226,6 +236,92 @@ fun DashboardScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Month Navigation Header Component
+ */
+@Composable
+fun MonthNavigationHeader(
+    selectedMonth: YearMonth,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onResetToCurrentMonth: () -> Unit
+) {
+    val isCurrentMonth = selectedMonth == YearMonth.now()
+    val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy")
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Previous Month Button
+            IconButton(
+                onClick = onPreviousMonth,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ChevronLeft,
+                    contentDescription = "Previous Month",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+
+            // Month Display with Reset Button
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = selectedMonth.format(monthFormatter),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+
+                if (!isCurrentMonth) {
+                    TextButton(
+                        onClick = onResetToCurrentMonth,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Today,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Current Month",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
+            // Next Month Button
+            IconButton(
+                onClick = onNextMonth,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Next Month",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             }
         }
     }
@@ -540,37 +636,52 @@ data class CategoryBreakdown(
 )
 
 /**
- * Calculate statistics from expenses
+ * Calculate statistics from expenses based on selected month
  */
-fun calculateStatistics(expenses: List<Expense>): ExpenseStatistics {
+fun calculateStatistics(expenses: List<Expense>, selectedMonth: YearMonth = YearMonth.now()): ExpenseStatistics {
     val now = LocalDate.now()
-    val thisMonth = YearMonth.from(now)
-    val lastMonth = thisMonth.minusMonths(1)
-    val weekStart = now.minusDays(now.dayOfWeek.value.toLong() - 1)
-    
+    val lastMonth = selectedMonth.minusMonths(1)
+
+    // Calculate week boundaries for selected month
+    val firstDayOfMonth = selectedMonth.atDay(1)
+    val isCurrentMonth = selectedMonth == YearMonth.now()
+    val weekStart = if (isCurrentMonth) {
+        now.minusDays(now.dayOfWeek.value.toLong() - 1)
+    } else {
+        firstDayOfMonth
+    }
+
     val totalExpenses = expenses.sumOf { it.amount }
-    
+
     val thisMonthExpenses = expenses
-        .filter { YearMonth.from(it.date) == thisMonth }
+        .filter { YearMonth.from(it.date) == selectedMonth }
         .sumOf { it.amount }
-    
+
     val lastMonthExpenses = expenses
         .filter { YearMonth.from(it.date) == lastMonth }
         .sumOf { it.amount }
-    
-    val thisWeekExpenses = expenses
-        .filter { it.date >= weekStart }
-        .sumOf { it.amount }
-    
+
+    val thisWeekExpenses = if (isCurrentMonth) {
+        expenses
+            .filter { it.date >= weekStart }
+            .sumOf { it.amount }
+    } else {
+        // For past/future months, show first week expenses
+        val weekEnd = weekStart.plusDays(6)
+        expenses
+            .filter { it.date >= weekStart && it.date <= weekEnd }
+            .sumOf { it.amount }
+    }
+
     val monthlyChangePercent = if (lastMonthExpenses == 0.0) {
         if (thisMonthExpenses > 0) 100 else 0
     } else {
         (((thisMonthExpenses - lastMonthExpenses) / lastMonthExpenses) * 100).toInt()
     }
-    
-    // Generate monthly trend for last 6 months
+
+    // Generate monthly trend - 6 months centered around selected month
     val monthlyTrend = (5 downTo 0).map { monthsBack ->
-        val month = thisMonth.minusMonths(monthsBack.toLong())
+        val month = selectedMonth.minusMonths(monthsBack.toLong())
         val monthExpenses = expenses
             .filter { YearMonth.from(it.date) == month }
             .sumOf { it.amount }
@@ -579,7 +690,7 @@ fun calculateStatistics(expenses: List<Expense>): ExpenseStatistics {
             amount = monthExpenses
         )
     }
-    
+
     return ExpenseStatistics(
         totalExpenses = totalExpenses,
         thisMonth = thisMonthExpenses,
@@ -596,25 +707,25 @@ fun calculateStatistics(expenses: List<Expense>): ExpenseStatistics {
 @Composable
 fun CategoryBreakdownCard(
     expenses: List<Expense>,
-    categoryRepository: CategoryRepositoryImpl
+    categoryRepository: CategoryRepositoryImpl,
+    selectedMonth: YearMonth = YearMonth.now()
 ) {
     var categories by remember { mutableStateOf<List<Category>>(emptyList()) }
-    val currentMonth = YearMonth.from(LocalDate.now())
-    
+
     // Load categories
     LaunchedEffect(Unit) {
         categoryRepository.getActiveCategories().collect { categoryList ->
             categories = categoryList
         }
     }
-    
-    // Calculate category breakdown for current month
-    val currentMonthExpenses = expenses.filter { 
-        YearMonth.from(it.date) == currentMonth 
+
+    // Calculate category breakdown for selected month
+    val selectedMonthExpenses = expenses.filter {
+        YearMonth.from(it.date) == selectedMonth
     }
-    
-    val categoryBreakdown = remember(currentMonthExpenses, categories) {
-        calculateCategoryBreakdown(currentMonthExpenses, categories)
+
+    val categoryBreakdown = remember(selectedMonthExpenses, categories) {
+        calculateCategoryBreakdown(selectedMonthExpenses, categories)
     }
     
     Card(
@@ -702,7 +813,7 @@ fun CategoryBreakdownCard(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "${category.percentage.toInt()}%",
+                                    text = String.format("%.1f%%", category.percentage),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -775,8 +886,8 @@ fun calculateCategoryBreakdown(expenses: List<Expense>, categories: List<Categor
             100.0 - runningPercentage
         } else {
             ((amount / totalAmount) * 100).let { calculated ->
-                // Round to 1 decimal place to avoid excessive precision
-                (calculated * 10).toInt() / 10.0
+                // Properly round to 1 decimal place
+                kotlin.math.round(calculated * 10.0) / 10.0
             }
         }
         
