@@ -36,8 +36,8 @@ abstract class NetworkModule {
     ): UserContextProvider
     
     companion object {
-    
-    private const val BASE_URL = "https://spentracker.live/api/"
+
+    private val BASE_URL = com.example.spenttracker.BuildConfig.API_BASE_URL
     
     @Provides
     @Singleton

@@ -41,10 +41,10 @@
         android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="31">
         
-        <!-- TODO: Add your Google Places API key here -->
+        <!-- Google Places API key loaded from local.properties -->
          <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyCBRmprwVFiRdOFzlrs87Q_OST9nGACYvQ" />
+            android:value="${GOOGLE_MAPS_API_KEY}" />
         
         <!-- Disable default WorkManager initialization -->
         <provider

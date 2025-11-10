@@ -1,0 +1,16 @@
+## This file must *NOT* be checked into Version Control Systems,
+# as it contains information specific to your local configuration.
+#
+# Location of the SDK. This is only used by Gradle.
+# For customization when using a Version Control System, please read the
+# header note.
+
+# Android SDK location (update with your SDK path)
+sdk.dir=/path/to/your/android/sdk
+
+# API Keys (DO NOT commit this file to version control)
+# Get your Google Maps API key from: https://console.cloud.google.com/google/maps-apis
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+
+# Backend API Base URL
+API_BASE_URL=https://spentracker.live/api/
